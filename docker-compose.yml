@@ -1,0 +1,17 @@
+services:
+  control-plane:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_MODE: "demo"
+      DEVIN_MODE: "mock"
+      GITHUB_MODE: "mock"
+      DATABASE_PATH: "/data/remediation.db"
+      GITHUB_WEBHOOK_SECRET: "demo-secret"
+      TRIGGER_LABEL: "devin-remediate"
+    volumes:
+      - remediator-data:/data
+
+volumes:
+  remediator-data:

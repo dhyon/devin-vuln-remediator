@@ -1,0 +1,195 @@
+{
+  "note": "Example-only Superset security remediation issue templates. Use these for demo mode or as a formatting guide. For an actual take-home submission, run Bandit, pip-audit, Safety, or a focused manual review against your Superset fork and curate real findings into demo/findings.json. Do not claim CVEs unless scanner output explicitly provides them.",
+  "findings": [
+    {
+      "title": "Scanner-derived finding: dependency package requires security review and narrow upgrade",
+      "source": "pip-audit or Safety output",
+      "category": "dependency vulnerability",
+      "severity": "medium",
+      "complexity": "small",
+      "affected_area": "Python dependency constraints",
+      "affected_package": "replace-with-package-from-scanner-output",
+      "scanner_rule": "replace-with-advisory-or-tool-finding-id",
+      "risk": "A dependency scanner reported that a package version used by the Superset fork has a security advisory. The risk and upgrade target must be confirmed from the scanner output before filing the real issue.",
+      "acceptance_criteria": [
+        "Confirm the affected package, installed version, and patched version from scanner output.",
+        "Apply the narrowest safe version bump or constraint update.",
+        "Verify dependency resolution still succeeds."
+      ],
+      "suggested_verification": [
+        "Re-run pip-audit or Safety after the dependency change.",
+        "Run a focused import or test path that exercises the affected dependency if one is identifiable."
+      ],
+      "non_goals": [
+        "Do not claim a CVE unless the scanner output explicitly names one.",
+        "Do not upgrade unrelated dependencies."
+      ]
+    },
+    {
+      "title": "Security hygiene finding: add input validation for user-controlled identifier",
+      "source": "manual security review",
+      "category": "missing input validation",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "request parameter validation",
+      "affected_file": "superset/path/to/confirmed_handler.py",
+      "risk": "A user-controlled identifier appears to flow into security-sensitive lookup or filtering logic without an explicit allowlist, schema check, or normalization step. The real issue should reference the confirmed source and sink.",
+      "acceptance_criteria": [
+        "Add explicit validation or normalization for the affected input.",
+        "Reject malformed values with a safe error response.",
+        "Add focused tests for accepted, rejected, and boundary inputs."
+      ],
+      "suggested_verification": [
+        "Run the targeted tests for the affected handler or service.",
+        "Manually exercise one valid and one invalid request path."
+      ],
+      "non_goals": [
+        "Do not redesign the full request handling flow.",
+        "Do not introduce broad validation changes outside the confirmed path."
+      ]
+    },
+    {
+      "title": "Scanner-derived finding: review path handling for filesystem access",
+      "source": "Bandit or Semgrep output",
+      "category": "insecure temp file or path handling",
+      "severity": "medium",
+      "complexity": "large",
+      "affected_area": "filesystem path handling",
+      "affected_file": "superset/path/to/confirmed_file_access.py",
+      "scanner_rule": "replace-with-bandit-or-semgrep-rule-id",
+      "risk": "A scanner flagged a path or temporary-file handling pattern that may allow unsafe path construction, weak file permissions, or unreliable cleanup. The real issue should cite the exact scanner finding and affected call site.",
+      "acceptance_criteria": [
+        "Confirm whether the flagged path is user-influenced or security-sensitive.",
+        "Use safe path joining, normalization, or tempfile APIs as appropriate.",
+        "Ensure cleanup and permission behavior are explicit.",
+        "Add regression coverage for the confirmed risky path."
+      ],
+      "suggested_verification": [
+        "Re-run the scanner rule against the affected file.",
+        "Run focused tests for the file or export/import workflow."
+      ],
+      "non_goals": [
+        "Do not rewrite storage architecture.",
+        "Do not alter unrelated filesystem workflows."
+      ]
+    },
+    {
+      "title": "Scanner-derived finding: hardcoded secret-like value in test fixture",
+      "source": "Bandit or secret scanner output",
+      "category": "hardcoded secret-like test fixture",
+      "severity": "low",
+      "complexity": "small",
+      "affected_area": "test fixtures",
+      "affected_file": "tests/path/to/confirmed_fixture.py",
+      "scanner_rule": "replace-with-secret-scanner-or-bandit-rule-id",
+      "risk": "A scanner identified a secret-like value in a test fixture. The value may be intentionally fake, but replacing it with an obvious placeholder can reduce noise and avoid normalizing realistic secrets in tests.",
+      "acceptance_criteria": [
+        "Replace the secret-like value with an obviously fake placeholder or generated value.",
+        "Keep the test behavior unchanged.",
+        "Avoid global scanner suppressions."
+      ],
+      "suggested_verification": [
+        "Run the affected test file.",
+        "Re-run the scanner rule that flagged the fixture."
+      ],
+      "non_goals": [
+        "Do not rotate credentials unless a real secret is confirmed.",
+        "Do not suppress the scanner for the whole repository."
+      ]
+    },
+    {
+      "title": "Security hygiene finding: make failure handling explicit in security-sensitive check",
+      "source": "manual security review",
+      "category": "insufficient error handling",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "security-sensitive validation or authorization check",
+      "affected_file": "superset/path/to/confirmed_check.py",
+      "risk": "A security-relevant check may return an ambiguous result when an internal dependency fails, times out, or returns unexpected data. The remediation should preserve behavior while making failure states explicit and observable.",
+      "acceptance_criteria": [
+        "Return a safe failure state when the check cannot complete.",
+        "Log actionable context without exposing sensitive values.",
+        "Add tests for dependency failure, malformed response, or timeout behavior."
+      ],
+      "suggested_verification": [
+        "Run focused tests for the affected validation or authorization check.",
+        "Exercise a simulated failure path."
+      ],
+      "non_goals": [
+        "Do not add new external services.",
+        "Do not change unrelated authorization behavior."
+      ]
+    },
+    {
+      "title": "Security hygiene finding: restrict debug behavior to explicit local development mode",
+      "source": "manual security review or Semgrep output",
+      "category": "unsafe debug behavior",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "configuration and debug behavior",
+      "affected_file": "superset/path/to/confirmed_debug_config.py",
+      "scanner_rule": "optional-replace-with-rule-id-if-scanner-derived",
+      "risk": "A debug-only behavior appears reachable without a sufficiently explicit local-development guard. In a real issue, cite the exact configuration pathway and why it could be enabled outside local development.",
+      "acceptance_criteria": [
+        "Require an explicit local-development condition before enabling debug behavior.",
+        "Preserve legitimate local developer ergonomics.",
+        "Add tests covering local and non-local configuration cases."
+      ],
+      "suggested_verification": [
+        "Run configuration tests for the affected module.",
+        "Confirm production-like settings do not enable debug behavior."
+      ],
+      "non_goals": [
+        "Do not remove legitimate local-only debugging support.",
+        "Do not change unrelated configuration defaults."
+      ]
+    },
+    {
+      "title": "Scanner-derived finding: narrow broad exception handling around sensitive logic",
+      "source": "Bandit, Semgrep, or manual security review",
+      "category": "overly broad exception handling",
+      "severity": "medium",
+      "complexity": "large",
+      "affected_area": "security-sensitive error handling",
+      "affected_file": "superset/path/to/confirmed_exception_handler.py",
+      "scanner_rule": "optional-replace-with-rule-id-if-scanner-derived",
+      "risk": "A broad exception handler may hide validation, authorization, or data-protection failures and allow execution to continue in a less safe state. The real issue should identify the expected exception types and the safe fallback behavior.",
+      "acceptance_criteria": [
+        "Catch only expected exception types where practical.",
+        "Fail closed or return a safe error for unexpected failures.",
+        "Add focused tests for expected and unexpected failure paths."
+      ],
+      "suggested_verification": [
+        "Run targeted tests for the affected module.",
+        "Manually confirm unexpected exceptions are not silently swallowed."
+      ],
+      "non_goals": [
+        "Do not rewrite unrelated error handling.",
+        "Do not expose sensitive exception details to end users."
+      ]
+    },
+    {
+      "title": "Security hygiene finding: add regression test for previously fixed security boundary",
+      "source": "manual security review",
+      "category": "missing security regression test",
+      "severity": "low",
+      "complexity": "small",
+      "affected_area": "security regression coverage",
+      "affected_file": "tests/path/to/target_security_regression_test.py",
+      "risk": "A security-relevant boundary appears to rely on behavior that is not covered by a focused regression test. The remediation should add coverage for the confirmed boundary without changing production behavior unless a bug is found.",
+      "acceptance_criteria": [
+        "Identify the security boundary that lacks regression coverage.",
+        "Add a focused test that fails if the boundary regresses.",
+        "Avoid broad or slow test additions."
+      ],
+      "suggested_verification": [
+        "Run the new focused regression test.",
+        "Run the nearest existing test file or test class."
+      ],
+      "non_goals": [
+        "Do not refactor production code unless the missing test exposes a real defect.",
+        "Do not add broad end-to-end coverage for a narrow boundary."
+      ]
+    }
+  ]
+}
