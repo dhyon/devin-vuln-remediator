@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from app.analytics_client import AnalyticsClient, MockAnalyticsClient
@@ -233,7 +233,7 @@ async def report() -> str:
             f"Devin has opened {summary.pr_created_jobs} remediation PRs. Completion rate is {summary.completion_rate:.0%}; terminal success rate is {summary.success_rate:.0%} across completed or failed jobs.",
             f"Estimated engineering effort avoided: {summary.engineer_hours_avoided:.1f} hours (${summary.estimated_cost_avoided:,.0f}).",
             f"Backlog reduction: {summary.backlog_reduction_percentage:.1f}%. Total ACUs consumed: {summary.total_acus_consumed:.1f}.",
-            f"Average time to PR: {format_seconds(summary.average_time_to_pr_seconds)}. Average completion cycle: {format_seconds(summary.average_time_to_completion_seconds)}.",
+            f"Median time to PR: {format_seconds(summary.median_time_to_pr_seconds)}. Average completion cycle: {format_seconds(summary.average_time_to_completion_seconds)}.",
             "",
             "Operational readout:",
             f"- Waiting for user or approval: {summary.waiting_jobs}",
@@ -255,18 +255,21 @@ def format_seconds(seconds: float | None) -> str:
 
 @app.post("/demo/seed")
 async def seed_demo() -> dict[str, object]:
+    require_demo_mode()
     seeded = seed_demo_control_plane(reset=True)
     return {"seeded": seeded}
 
 
 @app.get("/demo/seed")
 async def seed_demo_from_browser() -> dict[str, object]:
+    require_demo_mode()
     seeded = seed_demo_control_plane(reset=True)
     return {"seeded": seeded}
 
 
 @app.post("/demo/simulate-webhook")
 async def simulate_webhook() -> dict[str, object]:
+    require_demo_mode()
     event = GitHubIssueEvent(
         action="labeled",
         label=settings.target_label,
@@ -278,3 +281,8 @@ async def simulate_webhook() -> dict[str, object]:
     )
     job = await poller.start_remediation(event)
     return {"accepted": True, "job": job.model_dump(mode="json")}
+
+
+def require_demo_mode() -> None:
+    if not settings.demo_mode:
+        raise HTTPException(status_code=404, detail="Demo endpoints are disabled outside APP_MODE=demo")

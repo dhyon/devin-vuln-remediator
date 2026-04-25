@@ -76,3 +76,11 @@ def test_real_mode_accepts_required_credentials(monkeypatch: pytest.MonkeyPatch)
     assert settings.devin_api_key == "devin-token"
     assert settings.devin_org_id == "org-1"
     assert settings.github_token == "github-token"
+
+
+def test_rejects_invalid_modes(monkeypatch: pytest.MonkeyPatch) -> None:
+    clear_env(monkeypatch)
+    monkeypatch.setenv("APP_MODE", "prod")
+
+    with pytest.raises(ConfigurationError, match="APP_MODE"):
+        Settings.from_env()

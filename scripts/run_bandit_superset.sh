@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SUPERSET_REPO="${1:-${SUPSERSET_REPO_PATH:-${SUPERSET_REPO_PATH:-../superset}}}"
+SUPERSET_REPO="${1:-${SUPERSET_REPO_PATH:-../superset}}"
 OUTPUT="${OUTPUT:-demo/bandit-results.json}"
 
 if [[ ! -d "$SUPERSET_REPO" ]]; then
   echo "Superset repo path not found: $SUPERSET_REPO"
-  echo "Usage: SUPSERSET_REPO_PATH=/path/to/superset $0"
+  echo "Usage: SUPERSET_REPO_PATH=/path/to/superset $0"
   echo "   or: $0 /path/to/superset"
   exit 2
 fi

@@ -128,6 +128,18 @@ def test_github_comment_is_posted_after_session_starts() -> None:
     assert body.startswith("Started Devin remediation session: https://app.devin.ai/sessions/")
 
 
+def test_demo_routes_are_disabled_outside_demo_mode() -> None:
+    original_demo_mode = app_main.settings.demo_mode
+    try:
+        object.__setattr__(app_main.settings, "demo_mode", False)
+        with TestClient(app_main.app) as client:
+            response = client.post("/demo/simulate-webhook")
+    finally:
+        object.__setattr__(app_main.settings, "demo_mode", original_demo_mode)
+
+    assert response.status_code == 404
+
+
 def issue_payload(issue_number: int = 42, labels: list[str] | None = None, label: str = "devin-remediate") -> dict:
     labels = labels or ["security", "devin-remediate"]
     return {

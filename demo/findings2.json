@@ -1,0 +1,86 @@
+{
+  "note": "Curated Bandit findings selected from demo/bandit-results.json for a focused remediation demo. These intentionally avoid the findings already present in demo/findings.json. Each issue should still be validated against the affected Superset code path before claiming confirmed exploitability.",
+  "findings": [
+    {
+      "title": "Bandit B301: review pickle deserialization in key-value codec",
+      "source": "Bandit",
+      "category": "unsafe deserialization",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "key-value storage decoding",
+      "affected_file": "superset/key_value/types.py:85",
+      "scanner_rule": "B301",
+      "risk": "Bandit flagged pickle.loads(value) in a key-value codec. Pickle can execute code during deserialization if the byte stream is attacker-controlled, so the remediation should confirm whether stored values can be influenced by users, imports, migrations, or external storage backends before decoding.",
+      "acceptance_criteria": [
+        "Confirm the trust boundary for byte values decoded by the PickleKeyValueCodec.",
+        "Replace pickle with a safer structured format where compatibility allows.",
+        "If pickle compatibility is required, restrict the codec to trusted namespaces and document that boundary.",
+        "Add focused tests covering expected decoded values and rejection or isolation of untrusted values."
+      ],
+      "suggested_verification": [
+        "Run focused key-value codec tests.",
+        "Re-run Bandit for superset/key_value/types.py.",
+        "Exercise one caller that reads existing key-value records to confirm compatibility behavior."
+      ],
+      "non_goals": [
+        "Do not migrate stored key-value data without an explicit compatibility plan.",
+        "Do not remove support for legacy records unless the migration path is defined.",
+        "Do not claim exploitability without confirming untrusted data can reach the pickle decoder."
+      ]
+    },
+    {
+      "title": "Bandit B102: constrain dynamic exec in extension module loading",
+      "source": "Bandit",
+      "category": "dynamic code execution",
+      "severity": "medium",
+      "complexity": "large",
+      "affected_area": "extension loading",
+      "affected_file": "superset/extensions/utils.py:60",
+      "scanner_rule": "B102",
+      "risk": "Bandit flagged exec(code, module.__dict__) after compiling extension source. Dynamic execution may be required for extension imports, but the remediation should verify that source files come only from trusted extension packages and that the loader cannot be pointed at arbitrary user-controlled code.",
+      "acceptance_criteria": [
+        "Confirm how extension source paths are discovered and who can influence them.",
+        "Add explicit trust-boundary checks around extension module loading where practical.",
+        "Fail closed with clear logging when an extension source path is outside the expected package or allowlist.",
+        "Add tests for accepted extension modules and rejected unexpected source paths."
+      ],
+      "suggested_verification": [
+        "Run extension loader tests or the nearest tests for superset/extensions/utils.py.",
+        "Re-run Bandit for superset/extensions/utils.py.",
+        "Manually load a known-good extension and confirm rejected paths produce a safe error."
+      ],
+      "non_goals": [
+        "Do not remove legitimate extension loading support.",
+        "Do not redesign the full plugin architecture.",
+        "Do not suppress the Bandit finding without documenting the trust boundary."
+      ]
+    },
+    {
+      "title": "Bandit B701: enable safe Jinja autoescape behavior in extension templates",
+      "source": "Bandit",
+      "category": "template autoescape disabled",
+      "severity": "high",
+      "complexity": "medium",
+      "affected_area": "extensions CLI template generation",
+      "affected_file": "superset-extensions-cli/src/superset_extensions_cli/cli.py:834",
+      "scanner_rule": "B701",
+      "risk": "Bandit flagged a Jinja Environment created without explicit autoescape configuration. Even when templates are used for generated extension files rather than direct web responses, unescaped user-supplied template context can still produce unsafe HTML, JavaScript, or configuration output if later served by an extension.",
+      "acceptance_criteria": [
+        "Confirm which templates are rendered by the extensions CLI and which context values come from user input.",
+        "Configure Jinja autoescape explicitly using select_autoescape or an equivalent template-aware policy.",
+        "Mark intentionally raw generated code sections explicitly rather than relying on global autoescape defaults.",
+        "Add focused tests for template rendering with characters that require escaping."
+      ],
+      "suggested_verification": [
+        "Run the extensions CLI template tests.",
+        "Re-run Bandit for superset-extensions-cli/src/superset_extensions_cli/cli.py.",
+        "Generate a sample extension and inspect escaped values in generated templates."
+      ],
+      "non_goals": [
+        "Do not rewrite the extension scaffold templates wholesale.",
+        "Do not change generated extension APIs outside escaping behavior.",
+        "Do not claim web XSS without confirming generated output is served or rendered in a browser."
+      ]
+    }
+  ]
+}

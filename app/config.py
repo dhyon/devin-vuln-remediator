@@ -70,6 +70,18 @@ class Settings:
         return settings
 
     def validate(self) -> None:
+        if self.app_mode not in {"demo", "real"}:
+            raise ConfigurationError("APP_MODE must be either 'demo' or 'real'")
+        if self.devin_mode not in {"mock", "real"}:
+            raise ConfigurationError("DEVIN_MODE must be either 'mock' or 'real'")
+        if self.github_mode not in {"mock", "real"}:
+            raise ConfigurationError("GITHUB_MODE must be either 'mock' or 'real'")
+        if self.poll_limit < 1:
+            raise ConfigurationError("POLL_LIMIT must be at least 1")
+        if self.engineer_hours_per_remediation < 0:
+            raise ConfigurationError("ENGINEER_HOURS_PER_REMEDIATION must be non-negative")
+        if self.engineer_hourly_cost < 0:
+            raise ConfigurationError("ENGINEER_HOURLY_COST must be non-negative")
         if self.demo_mode:
             return
         missing: list[str] = []

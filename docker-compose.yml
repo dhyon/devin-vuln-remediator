@@ -4,14 +4,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      APP_MODE: "demo"
-      DEVIN_MODE: "mock"
-      GITHUB_MODE: "mock"
-      DATABASE_PATH: "/data/remediation.db"
-      GITHUB_WEBHOOK_SECRET: "demo-secret"
-      TRIGGER_LABEL: "devin-remediate"
+      APP_MODE: "real"
+      DEVIN_MODE: "real"
+      GITHUB_MODE: "real"
+      DATABASE_PATH: "/data/remediator-real.db"
+      GITHUB_WEBHOOK_SECRET: "${GITHUB_WEBHOOK_SECRET:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      GITHUB_API_BASE_URL: "${GITHUB_API_BASE_URL:-https://api.github.com}"
+      DEVIN_API_KEY: "${DEVIN_API_KEY:-}"
+      DEVIN_ORG_ID: "${DEVIN_ORG_ID:-}"
+      DEVIN_API_BASE_URL: "${DEVIN_API_BASE_URL:-https://api.devin.ai}"
+      DEVIN_REPOS: "${DEVIN_REPOS:-}"
+      DEVIN_MAX_ACU_LIMIT: "${DEVIN_MAX_ACU_LIMIT:-}"
+      DEVIN_ENTERPRISE_ANALYTICS: "${DEVIN_ENTERPRISE_ANALYTICS:-false}"
+      TRIGGER_LABEL: "${TRIGGER_LABEL:-devin-remediate}"
+      POLL_LIMIT: "${POLL_LIMIT:-25}"
+      ENGINEER_HOURS_PER_REMEDIATION: "${ENGINEER_HOURS_PER_REMEDIATION:-2.0}"
+      ENGINEER_HOURLY_COST: "${ENGINEER_HOURLY_COST:-150.0}"
     volumes:
-      - remediator-data:/data
-
-volumes:
-  remediator-data:
+      - ./data:/data

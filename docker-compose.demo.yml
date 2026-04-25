@@ -1,0 +1,20 @@
+services:
+  control-plane:
+    environment:
+      APP_MODE: "demo"
+      DEVIN_MODE: "mock"
+      GITHUB_MODE: "mock"
+      DATABASE_PATH: "/data/remediator-demo.db"
+      GITHUB_WEBHOOK_SECRET: "demo-secret"
+      GITHUB_TOKEN: ""
+      DEVIN_API_KEY: ""
+      DEVIN_ORG_ID: ""
+      DEVIN_REPOS: ""
+      DEVIN_MAX_ACU_LIMIT: ""
+      DEVIN_ENTERPRISE_ANALYTICS: "false"
+      TRIGGER_LABEL: "devin-remediate"
+    volumes:
+      - remediator-demo-data:/data
+
+volumes:
+  remediator-demo-data:

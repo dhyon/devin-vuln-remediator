@@ -1,184 +1,232 @@
-# Devin Vulnerability Remediator
+# Devin Vulnerability Remediation Control Plane
 
-A small event-driven vulnerability remediation control plane. It accepts GitHub issue label webhooks, starts Devin sessions, polls session insights, tracks remediation jobs in SQLite, comments back on GitHub issues, and exposes a simple dashboard and report.
+## Problem
 
-## Quick Demo
+Regulated engineering organizations accumulate CVE and security-finding backlogs faster than product teams can reliably burn them down. Security scanners and review programs are good at finding issues, but remediation work often sits outside sprint planning, competes with roadmap work, and creates growing audit pressure.
 
-```bash
-docker-compose up
+Manual remediation is also repetitive: inspect the finding, understand the repository context, make the narrow code or dependency change, run checks, open a PR, and report status. That work is automatable, but it still requires codebase awareness and test discipline.
+
+## Solution
+
+This project is a small remediation control plane for Devin-driven vulnerability work:
+
+- A GitHub issue with the `devin-remediate` label triggers a remediation job.
+- The app starts a Devin session with repository, issue, acceptance, and non-goal context.
+- Devin investigates, patches, runs focused checks where practical, and opens a reviewable PR.
+- The control plane tracks job status, Devin sessions, PRs, failures, ACUs, and throughput in SQLite.
+- The dashboard, metrics endpoint, and report endpoint answer the operational question: is this automation working?
+
+This is intentionally a focused take-home implementation: FastAPI, SQLite, Docker Compose, GitHub webhooks, Devin API clients, mock demo mode, and tests. It is production-shaped, not production-complete.
+
+## Architecture
+
+```text
+        GitHub issue labeled "devin-remediate"
+                         |
+                         v
+                POST /webhooks/github
+                         |
+          signature validation + event parsing
+                         |
+                         v
+                 remediation_jobs table
+                         |
+                         v
+              Devin session creation API
+                         |
+                         v
+         Devin investigates, patches, tests, opens PR
+                         |
+                         v
+                  POST /poll or scheduler
+                         |
+          Devin insights + optional ACU consumption
+                         |
+                         v
+        SQLite status, PR URL, failures, local events
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+      /dashboard, /metrics       GitHub issue comments
+          and /report
 ```
 
-Then open:
+Implemented components:
 
-- Health: http://localhost:8000/health
-- Dashboard: http://localhost:8000/dashboard
-- Metrics: http://localhost:8000/metrics
-- Report: http://localhost:8000/report
+- `app/main.py`: FastAPI routes for webhooks, polling, dashboard, metrics, report, and demo controls.
+- `app/github_webhook.py`: GitHub issue-event parsing and HMAC signature validation.
+- `app/devin_client.py`: real and mock Devin session clients.
+- `app/analytics_client.py`: Devin session insights and optional enterprise consumption lookup.
+- `app/poller.py`: job lifecycle orchestration and GitHub issue comments.
+- `app/store.py`: SQLite persistence for remediation jobs and lifecycle events.
+- `scripts/`: Superset scanner helpers, curated issue creation, demo seeding, and webhook simulation.
 
-Seed demo issues:
+## Why Devin
+
+Scanners find vulnerabilities. Ticketing systems route them. Devin is the remediation worker: it can inspect the repository, understand context, make the code change, run checks, and open a reviewable pull request.
+
+## One-Command Mock Demo
+
+Demo mode does not call external APIs. It uses mock Devin and GitHub clients plus an isolated Docker volume.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
+```
+
+Open:
+
+```text
+http://localhost:8000/dashboard
+```
+
+Useful demo commands:
 
 ```bash
 curl -X POST http://localhost:8000/demo/seed
-```
-
-Simulate the primary trigger without credentials:
-
-```bash
 curl -X POST http://localhost:8000/demo/simulate-webhook
 curl -X POST http://localhost:8000/poll
+curl http://localhost:8000/metrics
+curl http://localhost:8000/report
 ```
 
-The Docker Compose path runs with `APP_MODE=demo`, `DEVIN_MODE=mock`, and `GITHUB_MODE=mock`, so it does not require `DEVIN_API_KEY` or `GITHUB_TOKEN`. It uses SQLite storage in a Docker volume and seeds sample remediation jobs on startup.
+The `/demo/*` endpoints are disabled outside `APP_MODE=demo`.
 
-Reviewer flow:
+## Real Mode Setup
+
+The default `docker-compose.yml` runs real mode:
 
 ```bash
-docker-compose up
+cp .env.example .env
+# Edit .env with real credentials first.
+docker compose up --build
 ```
 
-Open http://localhost:8000/dashboard.
+Required environment variables:
 
-Seed or reset demo data:
+- `GITHUB_WEBHOOK_SECRET`: shared secret used to validate `X-Hub-Signature-256`.
+- `GITHUB_TOKEN`: GitHub token with issue comment access and PR read access for the target repo.
+- `DEVIN_API_KEY`: Devin API key.
+- `DEVIN_ORG_ID`: Devin organization ID.
+- `DEVIN_REPOS`: comma-separated repository allowlist, for example `your-user/superset`.
 
-```bash
-curl -X POST http://localhost:8000/demo/seed
-```
+Common optional variables:
 
-Simulate a GitHub issue receiving the `devin-remediate` label:
+- `TRIGGER_LABEL`: defaults to `devin-remediate`.
+- `DEVIN_MAX_ACU_LIMIT`: optional max ACU limit sent when creating Devin sessions.
+- `DEVIN_ENTERPRISE_ANALYTICS`: set `true` to attempt enterprise consumption lookups.
+- `POLL_LIMIT`: defaults to `25`.
+- `ENGINEER_HOURS_PER_REMEDIATION`: defaults to `2.0`.
+- `ENGINEER_HOURLY_COST`: defaults to `150.0`.
 
-```bash
-curl -X POST http://localhost:8000/demo/simulate-webhook
-```
+Real mode uses SQLite at `/data/remediator-real.db` inside the container, bind-mounted to `./data` by Compose.
 
-Advance mock Devin sessions:
-
-```bash
-curl -X POST http://localhost:8000/poll
-```
-
-## Real Mode
-
-Create or edit your local `.env` file and replace the placeholder values:
-
-```bash
-$EDITOR .env
-```
-
-At minimum, set these values in `.env`:
-
-- `GITHUB_WEBHOOK_SECRET`: a long random string; use the same value in the GitHub webhook UI.
-- `GITHUB_TOKEN`: a fine-grained personal access token with Issues read/write access to your Superset fork.
-- `DEVIN_API_KEY`: your Devin API key.
-- `DEVIN_ORG_ID`: your Devin organization ID.
-- `DEVIN_REPOS`: your fork, for example `your-user/superset`.
-
-Start the app and have Uvicorn load the env file:
-
-```bash
-. .venv/bin/activate
-uvicorn app.main:app --env-file .env --host 0.0.0.0 --port 8000
-```
-
-Confirm real mode is active:
+Health check:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-Expected response:
+Expected real-mode shape:
 
 ```json
 {"ok":true,"app_mode":"real","demo_mode":false}
 ```
 
-Expose your local app to GitHub with ngrok (reverse proxy):
+For GitHub webhooks, expose the service with a tunnel such as ngrok and configure:
 
-```bash
-ngrok http 8000
-```
-
-Copy the HTTPS forwarding URL from ngrok, then configure a GitHub issue webhook on your forked Apache Superset repository:
-
-- Payload URL: `https://{your-ngrok-host}.ngrok-free.app/webhooks/github`
+- Payload URL: `https://<host>/webhooks/github`
 - Content type: `application/json`
-- Secret: same value as `GITHUB_WEBHOOK_SECRET`
+- Secret: `GITHUB_WEBHOOK_SECRET`
 - Events: Issues
 
-When an issue receives the label `devin-remediate`, the control plane validates the webhook signature and starts a Devin remediation session.
+## Creating Real Superset Issues
 
-In real mode, startup validates that `DEVIN_API_KEY`, `DEVIN_ORG_ID`, `GITHUB_TOKEN`, and `GITHUB_WEBHOOK_SECRET` are present. Demo mode intentionally skips those requirements.
+Recommended workflow:
 
-## Endpoints
+1. Fork Apache Superset.
+2. Run Bandit and a dependency scanner against the fork:
 
-- `GET /health`
-- `POST /webhooks/github`
-- `POST /poll`
-- `GET /metrics`
-- `GET /dashboard`
-- `GET /report`
-- `POST /demo/seed`
-- `POST /demo/simulate-webhook`
+```bash
+SUPERSET_REPO_PATH=/path/to/superset bash scripts/run_bandit_superset.sh
+SUPERSET_REPO_PATH=/path/to/superset bash scripts/run_safety_superset.sh
+```
 
-## Local Development
+3. Curate 5 to 8 findings into `demo/findings.json`. Keep scanner output and affected paths grounded in the fork you actually scanned.
+4. Preview the GitHub issues:
+
+```bash
+GITHUB_REPOSITORY=your-user/superset python scripts/create_github_issues_from_findings.py --dry-run
+```
+
+5. Create the issues:
+
+```bash
+export GITHUB_TOKEN=your-token
+python scripts/create_github_issues_from_findings.py --repo your-user/superset --limit 8
+```
+
+The script creates issues with `security`, `devin-remediate`, and `demo` labels. If the webhook is configured, creating or labeling those issues triggers Devin sessions.
+
+This repository includes curated Superset-style demo findings and sample scanner output under `demo/`, including `demo/findings.json`, `demo/bandit-results.json`, `demo/dependency-results.json`, and `demo/pip-audit-results.json`. Treat them as demo fixtures unless you regenerate and validate them against your own Superset fork.
+
+## Observability
+
+- `GET /dashboard`: operational dashboard with backlog, active sessions, PRs, completion, failures, ACUs, timing, and recent lifecycle events.
+- `GET /metrics`: JSON metrics for automation or lightweight reporting.
+- `GET /report`: plain-text executive report.
+- Devin session insights: status, PR URLs, failures, message counts, session size, and ACUs when available.
+- Local lifecycle events: session starts, start failures, comment failures, and recent event history in SQLite.
+
+## Business Impact
+
+The dashboard and report estimate impact from completed remediations using configurable assumptions:
+
+- `ENGINEER_HOURS_PER_REMEDIATION`
+- `ENGINEER_HOURLY_COST`
+
+Example only, using demo-style numbers:
+
+- 8 findings queued
+- 5 PRs opened
+- Median time to PR: 18 minutes
+- Estimated engineer hours avoided: 10 hours
+- Estimated cost avoided: $1,500
+
+These are not production claims. They are the kind of operating metrics the control plane is designed to surface once connected to real findings and real Devin sessions.
+
+## Limitations
+
+- Human review is required; this system does not auto-merge.
+- Remediation quality depends on finding quality and acceptance criteria quality.
+- Enterprise ACU analytics may require account permissions and can be unavailable.
+- Scanner integration is intentionally simple: scripts produce raw output, and humans curate the final issue set.
+- Polling is exposed as `POST /poll`; a production deployment would typically run it on a schedule.
+- SQLite is appropriate for the assignment and local operation, not a multi-region control plane.
+
+## Phase 2
+
+- Scheduled scans.
+- Semgrep, Snyk, and GitHub code scanning integrations.
+- Jira and Slack integration.
+- Policy-based approvals.
+- Concurrency limits and queue controls.
+- SLA reporting.
+- Multi-repo support.
+
+## Testing
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
 pip install -e ".[test]"
 pytest
-uvicorn app.main:app --reload
 ```
 
-## Scripts
+## Security Notes
 
-- `scripts/run_bandit_superset.sh` runs Bandit against a Superset checkout.
-- `scripts/run_safety_superset.sh` runs `pip-audit` or Safety against a Superset checkout.
-- `scripts/create_github_issues_from_findings.py` creates GitHub issues from normalized finding JSON.
-- `scripts/simulate_webhook.py` sends a signed GitHub webhook to the local app.
-- `scripts/seed_demo_data.py` seeds the demo endpoint.
-
-## Creating Credible Superset Issues
-
-The demo is strongest when the GitHub issues come from real scanner output or real security-hygiene review findings in your forked Apache Superset repository. Do not invent CVEs or claim exploitability beyond what the scanner or code review supports. `demo/findings.example.json` contains demo templates only; use it for formatting, not as final submission evidence.
-
-Recommended workflow:
-
-1. Fork Apache Superset and clone your fork locally.
-2. Run Bandit and a dependency scanner:
-
-```bash
-SUPSERSET_REPO_PATH=/path/to/superset bash scripts/run_bandit_superset.sh
-SUPSERSET_REPO_PATH=/path/to/superset bash scripts/run_safety_superset.sh
-```
-
-The scripts write raw scanner output to:
-
-- `demo/bandit-results.json`
-- `demo/dependency-results.json`
-
-3. Curate 5 to 8 real findings into `demo/findings.json`. Use `demo/findings.example.json` as the schema and tone guide, but replace the examples with real affected files, packages, scanner IDs, risks, and verification steps from your fork.
-4. Preview issue payloads:
-
-```bash
-GITHUB_REPOSITORY=your-user/superset python scripts/create_github_issues_from_findings.py --dry-run
-```
-
-5. Create issues in your fork:
-
-```bash
-export GITHUB_TOKEN=your-token
-export GITHUB_REPOSITORY=your-user/superset
-python scripts/create_github_issues_from_findings.py --limit 5
-```
-
-Each created issue gets the labels `security`, `devin-remediate`, and `demo`. If your webhook is configured, applying or creating the issue with `devin-remediate` can trigger the control plane automation.
-
-You can filter curated findings by estimated complexity (`small`, `medium`, `large`, or `1` to `3`):
-
-```bash
-python scripts/create_github_issues_from_findings.py --dry-run --min-complexity small --max-complexity medium
-```
-
-## Design Notes
-
-This intentionally avoids Celery, Redis, Kafka, React, and a workflow engine. The control plane is a FastAPI app with SQLite and a manual `/poll` endpoint, which keeps it simple enough to review while still showing production-shaped concerns: authenticated webhooks, idempotent job creation, session lifecycle tracking, comments, metrics, and demo-safe clients.
+- GitHub webhooks are validated with HMAC SHA-256 signatures unless unsigned webhooks are explicitly allowed.
+- Demo mode does not call external APIs.
+- The app does not intentionally log secrets; keep API keys in environment variables or `.env`.
+- Use least-privilege GitHub tokens scoped to the repository and permissions required for issue comments and PR reads.
+- Devin credentials are required only in real mode.
