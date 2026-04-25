@@ -12,6 +12,7 @@ from app.models import GitHubIssueEvent, JobStatus, RemediationJob, SessionInsig
 
 ACTIVE_STATUSES = (
     JobStatus.QUEUED.value,
+    JobStatus.SESSION_STARTING.value,
     JobStatus.SESSION_STARTED.value,
     JobStatus.RUNNING.value,
     JobStatus.PR_OPENED.value,
@@ -122,6 +123,19 @@ class Store:
             ).fetchall()
         return [self._row_to_job(row) for row in rows]
 
+    def list_queued_jobs(self, limit: int = 25) -> list[RemediationJob]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM remediation_jobs
+                WHERE status = ? AND devin_session_id IS NULL
+                ORDER BY updated_at ASC
+                LIMIT ?
+                """,
+                (JobStatus.QUEUED.value, limit),
+            ).fetchall()
+        return [self._row_to_job(row) for row in rows]
+
     def update_job(self, job_id: int, **fields: Any) -> RemediationJob:
         if not fields:
             job = self._get_job_by_id(job_id)
@@ -158,6 +172,27 @@ class Store:
             raise KeyError(f"Job not found: {job_id}")
         return self._row_to_job(row)
 
+    def claim_session_start(self, job_id: int) -> RemediationJob | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                UPDATE remediation_jobs
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                  AND devin_session_id IS NULL
+                  AND status IN (?, ?)
+                RETURNING *
+                """,
+                (
+                    JobStatus.SESSION_STARTING.value,
+                    utcnow(),
+                    job_id,
+                    JobStatus.QUEUED.value,
+                    JobStatus.FAILED.value,
+                ),
+            ).fetchone()
+        return self._row_to_job(row) if row else None
+
     def record_event(self, job_id: int, event_type: str, message: str, payload: dict[str, Any] | None = None) -> None:
         with self.connect() as conn:
             conn.execute(
@@ -182,13 +217,19 @@ class Store:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def mark_pr_opened(self, job_id: int, pr_url: str, pr_state: str) -> RemediationJob:
+    def mark_pr_opened(
+        self,
+        job_id: int,
+        pr_url: str,
+        pr_state: str,
+        status: JobStatus = JobStatus.PR_OPENED,
+    ) -> RemediationJob:
         current = self._get_job_by_id(job_id)
         if current is None:
             raise KeyError(f"Job not found: {job_id}")
         return self.update_job(
             job_id,
-            status=JobStatus.PR_OPENED.value,
+            status=status.value,
             pr_url=pr_url,
             pr_state=pr_state,
             pr_opened_at=current.pr_opened_at.isoformat() if current.pr_opened_at else utcnow(),
@@ -201,6 +242,17 @@ class Store:
         return self.update_job(
             job_id,
             status=JobStatus.COMPLETED.value,
+            completed_at=current.completed_at.isoformat() if current.completed_at else utcnow(),
+        )
+
+    def mark_pr_closed(self, job_id: int) -> RemediationJob:
+        current = self._get_job_by_id(job_id)
+        if current is None:
+            raise KeyError(f"Job not found: {job_id}")
+        return self.update_job(
+            job_id,
+            status=JobStatus.PR_CLOSED.value,
+            pr_state="closed",
             completed_at=current.completed_at.isoformat() if current.completed_at else utcnow(),
         )
 
@@ -229,6 +281,7 @@ class Store:
         status = self._map_insight_status(insights)
         fields: dict[str, Any] = {
             "status": status.value,
+            "status_detail": insights.status_detail,
             "acus_consumed": insights.acu_used,
             "session_size": str(insights.session_size) if insights.session_size is not None else None,
             "num_devin_messages": insights.num_devin_messages,
@@ -239,7 +292,7 @@ class Store:
         fields = {key: value for key, value in fields.items() if value is not None}
         job = self.update_job(job_id, **fields)
         if insights.pr_url:
-            job = self.mark_pr_opened(job_id, insights.pr_url, job.pr_state or "open")
+            job = self.mark_pr_opened(job_id, insights.pr_url, insights.pr_state or job.pr_state or "open")
         if status == JobStatus.COMPLETED:
             job = self.mark_completed(job_id)
         if status == JobStatus.FAILED:
@@ -288,7 +341,7 @@ class Store:
             return JobStatus.FAILED
         if insights.needs_input or insights.status == "needs_input":
             return JobStatus.WAITING_FOR_USER
-        if insights.status == "waiting_for_approval":
+        if insights.status == "waiting_for_approval" or insights.status_detail == "waiting_for_approval":
             return JobStatus.WAITING_FOR_APPROVAL
         if insights.status == "completed":
             return JobStatus.COMPLETED

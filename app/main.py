@@ -229,8 +229,8 @@ async def report() -> str:
         [
             "# Devin Vulnerability Remediation Executive Report",
             "",
-            f"The control plane is tracking {summary.total_jobs} security findings, with {summary.active_jobs} active Devin sessions and {summary.completed_jobs} completed remediations.",
-            f"Devin has opened {summary.pr_created_jobs} remediation PRs with a {summary.success_rate:.0%} success rate across completed or failed jobs.",
+            f"The control plane is tracking {summary.total_jobs} security findings, with {summary.active_jobs} open remediation jobs, {summary.active_devin_sessions} active Devin sessions, and {summary.completed_jobs} completed remediations.",
+            f"Devin has opened {summary.pr_created_jobs} remediation PRs. Completion rate is {summary.completion_rate:.0%}; terminal success rate is {summary.success_rate:.0%} across completed or failed jobs.",
             f"Estimated engineering effort avoided: {summary.engineer_hours_avoided:.1f} hours (${summary.estimated_cost_avoided:,.0f}).",
             f"Backlog reduction: {summary.backlog_reduction_percentage:.1f}%. Total ACUs consumed: {summary.total_acus_consumed:.1f}.",
             f"Average time to PR: {format_seconds(summary.average_time_to_pr_seconds)}. Average completion cycle: {format_seconds(summary.average_time_to_completion_seconds)}.",

@@ -15,6 +15,9 @@ class GitHubClient(Protocol):
     async def get_issue(self, owner: str, repo: str, issue_number: int) -> dict:
         ...
 
+    async def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict:
+        ...
+
     async def comment_on_issue(self, repository: str, issue_number: int, body: str) -> None:
         ...
 
@@ -47,6 +50,15 @@ class RealGitHubClient:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(
                 f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}",
+                headers=self._headers(),
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}",
                 headers=self._headers(),
             )
             response.raise_for_status()
@@ -97,4 +109,12 @@ class MockGitHubClient:
             "body": "",
             "labels": [],
             "html_url": f"https://github.com/{owner}/{repo}/issues/{issue_number}",
+        }
+
+    async def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict:
+        return {
+            "number": pull_number,
+            "state": "open",
+            "merged": False,
+            "html_url": f"https://github.com/{owner}/{repo}/pull/{pull_number}",
         }

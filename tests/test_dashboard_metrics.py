@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from app.dashboard import render_dashboard
 from app.metrics import build_metrics
 from app.models import JobStatus, RemediationJob
 
@@ -40,22 +41,25 @@ def test_metrics_calculate_core_counts_and_rates() -> None:
             job(2, JobStatus.FAILED, base, completed_after=1200, acus=2),
             job(3, JobStatus.WAITING_FOR_USER, base, acus=1),
             job(4, JobStatus.RUNNING, base, acus=0.5),
+            job(5, JobStatus.PR_OPENED, base, pr_after=400, acus=1.5, pr_url="https://github.com/me/superset/pull/5"),
         ],
         engineer_hours_per_remediation=2.5,
         engineer_hourly_cost=200,
     )
 
-    assert metrics.total_jobs == 4
-    assert metrics.active_jobs == 2
+    assert metrics.total_jobs == 5
+    assert metrics.active_jobs == 3
+    assert metrics.active_devin_sessions == 2
     assert metrics.completed_jobs == 1
     assert metrics.failed_jobs == 1
     assert metrics.waiting_jobs == 1
-    assert metrics.pr_created_jobs == 1
+    assert metrics.pr_created_jobs == 2
+    assert metrics.completion_rate == 0.2
     assert metrics.success_rate == 0.5
-    assert metrics.total_acus_consumed == 6.5
+    assert metrics.total_acus_consumed == 8
     assert metrics.engineer_hours_avoided == 2.5
     assert metrics.estimated_cost_avoided == 500
-    assert metrics.backlog_reduction_percentage == 25
+    assert metrics.backlog_reduction_percentage == 20
 
 
 def test_metrics_calculate_time_to_pr_and_completion() -> None:
@@ -72,3 +76,15 @@ def test_metrics_calculate_time_to_pr_and_completion() -> None:
     assert metrics.average_time_to_completion_seconds == 750
     assert metrics.average_remediation_cycle_time_seconds == 750
     assert metrics.throughput_jobs_per_day > 0
+
+
+def test_dashboard_metric_boxes_include_hover_descriptions() -> None:
+    html = render_dashboard([job(1, JobStatus.COMPLETED, datetime(2026, 4, 24, 12, tzinfo=UTC), completed_after=600)])
+
+    assert 'class="card metric-box"' in html
+    assert 'class="panel metric-box"' in html
+    assert 'class="metric-help"' in html
+    assert 'class="metric-tooltip" role="tooltip"' in html
+    assert 'title="All security findings currently tracked by the control plane."' in html
+    assert 'data-description="All security findings currently tracked by the control plane."' in html
+    assert 'aria-label="Completion rate:' in html

@@ -55,7 +55,7 @@ def main() -> None:
             json=payload,
             timeout=30,
         )
-        response.raise_for_status()
+        handle_github_error(response, args.repo)
         print(response.json()["html_url"])
 
 
@@ -69,6 +69,47 @@ def load_findings(path: str) -> list[dict[str, Any]]:
     if not isinstance(findings, list):
         raise SystemExit("Findings JSON must be a list or an object with a 'findings' list.")
     return findings
+
+
+def handle_github_error(response: httpx.Response, repo: str) -> None:
+    if response.status_code < 400:
+        return
+
+    message = github_error_message(response)
+    if response.status_code == 410:
+        raise SystemExit(
+            f"GitHub rejected issue creation for {repo}: Issues appear to be disabled for this repository.\n"
+            "Enable Issues in the repository settings, then rerun this script.\n"
+            f"GitHub response: {message}"
+        )
+    if response.status_code == 401:
+        raise SystemExit(
+            "GitHub rejected the token with 401 Unauthorized. Check that GITHUB_TOKEN is set, copied correctly, and not expired.\n"
+            f"GitHub response: {message}"
+        )
+    if response.status_code == 403:
+        raise SystemExit(
+            f"GitHub rejected issue creation for {repo} with 403 Forbidden. "
+            "For a fine-grained token, grant Issues read/write access to this repository.\n"
+            f"GitHub response: {message}"
+        )
+    if response.status_code == 404:
+        raise SystemExit(
+            f"GitHub could not find {repo}, or the token cannot access it. Check GITHUB_REPOSITORY and token repository access.\n"
+            f"GitHub response: {message}"
+        )
+
+    response.raise_for_status()
+
+
+def github_error_message(response: httpx.Response) -> str:
+    try:
+        data = response.json()
+    except ValueError:
+        return response.text.strip()[:500] or f"HTTP {response.status_code}"
+    if isinstance(data, dict):
+        return str(data.get("message") or data)[:500]
+    return str(data)[:500]
 
 
 def filter_findings(

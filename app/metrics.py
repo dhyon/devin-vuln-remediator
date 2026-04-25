@@ -22,7 +22,13 @@ def build_metrics(
     total = len(jobs)
     completed = [job for job in jobs if job.status == JobStatus.COMPLETED]
     failed = [job for job in jobs if job.status == JobStatus.FAILED]
-    waiting = [job for job in jobs if job.status in {JobStatus.WAITING_FOR_USER, JobStatus.WAITING_FOR_APPROVAL}]
+    pr_closed = [job for job in jobs if job.status == JobStatus.PR_CLOSED]
+    waiting = [
+        job
+        for job in jobs
+        if job.status in {JobStatus.WAITING_FOR_USER, JobStatus.WAITING_FOR_APPROVAL}
+        or job.status_detail in {"waiting_for_user", "waiting_for_approval"}
+    ]
     active = [
         job
         for job in jobs
@@ -36,8 +42,19 @@ def build_metrics(
             JobStatus.WAITING_FOR_APPROVAL,
         }
     ]
+    active_devin_sessions = [
+        job
+        for job in jobs
+        if job.status
+        in {
+            JobStatus.SESSION_STARTED,
+            JobStatus.RUNNING,
+            JobStatus.WAITING_FOR_USER,
+            JobStatus.WAITING_FOR_APPROVAL,
+        }
+    ]
     prs = [job for job in jobs if job.pr_url]
-    terminal_count = len(completed) + len(failed)
+    terminal_count = len(completed) + len(failed) + len(pr_closed)
     time_to_pr = [
         (job.pr_opened_at - job.created_at).total_seconds()
         for job in jobs
@@ -45,7 +62,7 @@ def build_metrics(
     ]
     time_to_completion = [
         (job.completed_at - job.created_at).total_seconds()
-        for job in completed + failed
+        for job in completed + failed + pr_closed
         if job.completed_at and job.created_at
     ]
     throughput = _throughput_jobs_per_day(completed)
@@ -53,10 +70,12 @@ def build_metrics(
     return MetricsSummary(
         total_jobs=total,
         active_jobs=len(active),
+        active_devin_sessions=len(active_devin_sessions),
         completed_jobs=len(completed),
         failed_jobs=len(failed),
         waiting_jobs=len(waiting),
         pr_created_jobs=len(prs),
+        completion_rate=round(len(completed) / total, 3) if total else 0,
         success_rate=round(len(completed) / terminal_count, 3) if terminal_count else 0,
         average_time_to_pr_seconds=_round_optional(_avg(time_to_pr)),
         median_time_to_pr_seconds=round(median(time_to_pr), 2) if time_to_pr else None,

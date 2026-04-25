@@ -1,0 +1,132 @@
+{
+  "note": "Example-only Superset security remediation issue templates. Use these for demo mode or as a formatting guide. For an actual take-home submission, run Bandit, pip-audit, Safety, or a focused manual review against your Superset fork and curate real findings into demo/findings.json. Do not claim CVEs unless scanner output explicitly provides them.",
+  "findings": [
+    {
+      "title": "Bandit B310: restrict URL schemes before dataset import download",
+      "source": "Bandit",
+      "category": "unsafe URL handling",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "dataset import",
+      "affected_file": "superset/commands/dataset/importers/v1/utils.py:209",
+      "scanner_rule": "B310",
+      "risk": "Bandit flagged request.urlopen(data_uri). The remediation should confirm whether data_uri can be user-controlled and restrict downloads to expected schemes such as https/http, rejecting file:// or unexpected custom schemes.",
+      "acceptance_criteria": [
+        "Confirm the trust boundary for data_uri.",
+        "Reject unsupported URL schemes before calling urlopen.",
+        "Add focused tests for allowed and rejected schemes."
+      ],
+      "suggested_verification": [
+        "Run the targeted dataset import tests.",
+        "Re-run Bandit for the affected file."
+      ],
+      "non_goals": [
+        "Do not redesign dataset import storage.",
+        "Do not claim exploitability without confirming user control."
+      ]
+    },
+    {
+      "title": "Bandit B704: verify Markup anchor escaping for SQLAlchemy connector links",
+      "source": "Bandit",
+      "category": "potential XSS",
+      "severity": "medium",
+      "complexity": "medium",
+      "affected_area": "SQLAlchemy connector model link rendering",
+      "affected_file": "superset/connectors/sqla/models.py:1353",
+      "scanner_rule": "B704",
+      "risk": "Bandit flagged markupsafe.Markup around an HTML anchor built from url and name values. The remediation should confirm whether either value can be influenced by users and ensure link text and href values are escaped or validated before being marked safe.",
+      "acceptance_criteria": [
+        "Confirm the source and trust boundary for the url and name values used in the anchor.",
+        "Escape link text and validate or safely construct href values before returning Markup.",
+        "Add focused regression coverage for unsafe characters in link text and href values."
+      ],
+      "suggested_verification": [
+        "Run the targeted model or connector tests that cover rendered table links.",
+        "Re-run Bandit for superset/connectors/sqla/models.py.",
+        "Manually inspect rendered output for escaped link text and safe href handling."
+      ],
+      "non_goals": [
+        "Do not rewrite the connector model rendering layer.",
+        "Do not claim exploitability without confirming user-controlled input reaches the anchor."
+      ]
+    },
+    {
+      "title": "Bandit B506: replace unsafe YAML loader in example metadata import",
+      "source": "Bandit",
+      "category": "unsafe deserialization",
+      "severity": "medium",
+      "complexity": "small",
+      "affected_area": "example metadata import",
+      "affected_file": "superset/examples/utils.py:261",
+      "scanner_rule": "B506",
+      "risk": "Bandit flagged yaml.load(..., Loader=yaml.Loader) while parsing metadata from imported example content. The remediation should confirm the metadata source and switch to safe YAML parsing if arbitrary Python object construction is not required.",
+      "acceptance_criteria": [
+        "Confirm whether imported metadata requires custom YAML object construction.",
+        "Use yaml.safe_load or SafeLoader if plain structured metadata is sufficient.",
+        "Handle empty or malformed metadata with the existing safe error behavior.",
+        "Add focused coverage for valid metadata and malformed YAML input."
+      ],
+      "suggested_verification": [
+        "Run the example import tests or the nearest tests for superset/examples/utils.py.",
+        "Re-run Bandit for superset/examples/utils.py.",
+        "Manually import one example bundle with metadata to confirm behavior is preserved."
+      ],
+      "non_goals": [
+        "Do not redesign example import packaging.",
+        "Do not broaden YAML parsing behavior beyond the existing metadata schema."
+      ]
+    },
+    {
+      "title": "Bandit B608: parameterize Postgres backend termination query",
+      "source": "Bandit",
+      "category": "possible SQL injection",
+      "severity": "medium",
+      "complexity": "small",
+      "affected_area": "Postgres query cancellation",
+      "affected_file": "superset/db_engine_specs/postgres.py:826",
+      "scanner_rule": "B608",
+      "risk": "Bandit flagged string-based SQL construction around pg_terminate_backend(pid). The remediation should confirm the origin of cancel_query_id and use database parameter binding or strict validation before executing the termination query.",
+      "acceptance_criteria": [
+        "Confirm the trust boundary and expected format for cancel_query_id.",
+        "Replace string interpolation with parameterized SQL where supported.",
+        "Reject or safely ignore malformed process identifiers.",
+        "Add focused tests for valid and invalid cancellation identifiers."
+      ],
+      "suggested_verification": [
+        "Run Postgres engine spec tests that cover query cancellation.",
+        "Re-run Bandit for superset/db_engine_specs/postgres.py.",
+        "Manually verify a valid query cancellation path still works."
+      ],
+      "non_goals": [
+        "Do not change query cancellation behavior for other database engines.",
+        "Do not claim exploitability without confirming user control of cancel_query_id."
+      ]
+    },
+    {
+      "title": "Bandit B324: mark legacy MD5 namespace hash as non-security usage",
+      "source": "Bandit",
+      "category": "weak hash usage",
+      "severity": "high",
+      "complexity": "small",
+      "affected_area": "key-value namespace compatibility helper",
+      "affected_file": "superset/key_value/utils.py:73",
+      "scanner_rule": "B324",
+      "risk": "Bandit flagged md5() usage in a helper that appears to generate a legacy-compatible UUID namespace. The remediation should confirm the hash is not used for security decisions and either replace it with a stronger primitive or explicitly mark it as non-security usage where compatibility requires MD5.",
+      "acceptance_criteria": [
+        "Confirm whether the MD5 output is used only for deterministic legacy namespace compatibility.",
+        "If compatibility requires MD5, call md5 with usedforsecurity=False where supported and document the reason.",
+        "If compatibility does not require MD5, migrate to a stronger hash with a compatibility note.",
+        "Add or update tests proving namespace output remains stable or intentionally migrates."
+      ],
+      "suggested_verification": [
+        "Run key-value utility tests or focused tests for namespace generation.",
+        "Re-run Bandit for superset/key_value/utils.py.",
+        "Confirm any compatibility-sensitive callers still resolve existing namespaces."
+      ],
+      "non_goals": [
+        "Do not rotate or rewrite stored key-value data without a migration plan.",
+        "Do not claim password or token hashing risk unless a security-sensitive caller is confirmed."
+      ]
+    }
+  ]
+}

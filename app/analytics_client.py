@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 import httpx
@@ -130,15 +130,22 @@ class MockAnalyticsClient:
 
 def parse_session_insights(data: dict[str, Any]) -> SessionInsights:
     pull_requests = _pull_request_urls(data.get("pull_requests"))
+    pr_state = _first_pull_request_state(data.get("pull_requests"))
     analysis = data.get("analysis")
     return SessionInsights(
         session_id=data.get("session_id"),
         org_id=data.get("org_id"),
         status=str(data.get("status", "running")),
+        status_detail=data.get("status_detail"),
         acu_used=float(data.get("acus_consumed") or data.get("acu_used") or data.get("acu") or 0),
         pr_url=pull_requests[0] if pull_requests else data.get("pr_url"),
+        pr_state=pr_state or data.get("pr_state"),
         pull_requests=pull_requests,
-        needs_input=bool(data.get("needs_input") or data.get("status") == "needs_input"),
+        needs_input=bool(
+            data.get("needs_input")
+            or data.get("status") == "needs_input"
+            or data.get("status_detail") == "waiting_for_user"
+        ),
         failure_reason=data.get("failure_reason"),
         summary=analysis if isinstance(analysis, str) else data.get("summary"),
         url=data.get("url"),
@@ -170,11 +177,20 @@ def _pull_request_urls(value: Any) -> list[str]:
             if isinstance(item, str):
                 urls.append(item)
             elif isinstance(item, dict):
-                url = item.get("url") or item.get("html_url")
+                url = item.get("pr_url") or item.get("url") or item.get("html_url")
                 if url:
                     urls.append(str(url))
         return urls
     return []
+
+
+def _first_pull_request_state(value: Any) -> str | None:
+    if not isinstance(value, list):
+        return None
+    for item in value:
+        if isinstance(item, dict) and item.get("pr_state"):
+            return str(item["pr_state"])
+    return None
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -184,6 +200,8 @@ def _parse_datetime(value: Any) -> datetime | None:
         return value
     if isinstance(value, str):
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if isinstance(value, int | float):
+        return datetime.fromtimestamp(value, tz=UTC)
     return None
 
 

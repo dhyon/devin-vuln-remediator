@@ -17,19 +17,18 @@ def render_dashboard(
     metrics = build_metrics(jobs, engineer_hours_per_remediation, engineer_hourly_cost)
     events = events or []
     cards = [
-        ("Total findings", str(metrics.total_jobs)),
-        ("Active Devin sessions", str(metrics.active_jobs)),
-        ("Completed remediations", str(metrics.completed_jobs)),
-        ("PRs opened", str(metrics.pr_created_jobs)),
-        ("Success rate", pct(metrics.success_rate)),
-        ("Median time to PR", duration(metrics.median_time_to_pr_seconds)),
-        ("Average time to completion", duration(metrics.average_time_to_completion_seconds)),
-        ("Total ACUs consumed", f"{metrics.total_acus_consumed:.1f}"),
+        ("Total findings", str(metrics.total_jobs), "All security findings currently tracked by the control plane."),
+        ("Open remediation jobs", str(metrics.active_jobs), "Jobs still in the remediation workflow, including queued, running, PR-opened, and waiting states."),
+        ("Active Devin sessions", str(metrics.active_devin_sessions), "Jobs with Devin sessions that are started, running, or waiting for user or approval input."),
+        ("Completed remediations", str(metrics.completed_jobs), "Jobs Devin has finished successfully."),
+        ("PRs opened", str(metrics.pr_created_jobs), "Tracked jobs where Devin has opened a remediation pull request."),
+        ("Completion rate", pct(metrics.completion_rate), "Completed remediations divided by all tracked findings."),
+        ("Terminal success rate", pct(metrics.success_rate), "Completed jobs divided by jobs that reached either completed or failed."),
+        ("Median time to PR", duration(metrics.median_time_to_pr_seconds), "The middle time from job creation to Devin opening a pull request."),
+        ("Average time to completion", duration(metrics.average_time_to_completion_seconds), "Average time from job creation until jobs reached completed or failed."),
+        ("Total ACUs consumed", f"{metrics.total_acus_consumed:.1f}", "Total Agent Compute Units reported across tracked Devin sessions."),
     ]
-    card_html = "\n".join(
-        f'<div class="card"><div class="label">{escape(label)}</div><div class="value">{escape(value)}</div></div>'
-        for label, value in cards
-    )
+    card_html = "\n".join(render_metric_box("card", label, value, description) for label, value, description in cards)
     rows = "\n".join(render_job_row(job) for job in jobs) or '<tr><td colspan="10">No jobs yet.</td></tr>'
     event_rows = "\n".join(render_event_row(event) for event in events) or '<tr><td colspan="5">No events recorded yet.</td></tr>'
     demo_controls = ""
@@ -56,6 +55,58 @@ curl -X POST http://localhost:8000/poll</pre>
     h2 {{ font-size: 18px; margin: 28px 0 12px; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }}
     .card, .panel {{ background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 14px; }}
+    .metric-box {{ position: relative; outline: none; }}
+    .metric-box:hover,
+    .metric-box:focus-within {{ z-index: 10; }}
+    .metric-box:focus-visible {{ border-color: #075985; box-shadow: 0 0 0 3px rgba(7, 89, 133, .14); }}
+    .metric-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
+    .metric-help {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+    }}
+    .metric-help:focus {{ outline: none; }}
+    .metric-help:focus-visible {{ border-color: #075985; box-shadow: 0 0 0 3px rgba(7, 89, 133, .14); }}
+    .metric-tooltip {{
+      position: absolute;
+      right: -2px;
+      bottom: calc(100% + 9px);
+      width: min(260px, 72vw);
+      z-index: 20;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(3px);
+      transition: opacity .14s ease, transform .14s ease;
+      background: #172033;
+      color: #fff;
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.35;
+      letter-spacing: 0;
+      text-transform: none;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .16);
+    }}
+    .metric-help:hover .metric-tooltip,
+    .metric-help:focus-visible .metric-tooltip {{
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }}
     .label {{ color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }}
     .value {{ font-size: 24px; font-weight: 700; margin-top: 7px; }}
     .impact {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }}
@@ -78,10 +129,10 @@ curl -X POST http://localhost:8000/poll</pre>
     <section>
       <h2>Business impact</h2>
       <div class="impact">
-        <div class="panel"><div class="label">Engineer hours avoided</div><div class="value">{metrics.engineer_hours_avoided:.1f}</div></div>
-        <div class="panel"><div class="label">Estimated cost avoided</div><div class="value">${metrics.estimated_cost_avoided:,.0f}</div></div>
-        <div class="panel"><div class="label">Backlog reduction</div><div class="value">{metrics.backlog_reduction_percentage:.1f}%</div></div>
-        <div class="panel"><div class="label">Average remediation cycle time</div><div class="value">{duration(metrics.average_remediation_cycle_time_seconds)}</div></div>
+        {render_metric_box("panel", "Engineer hours avoided", f"{metrics.engineer_hours_avoided:.1f}", "Completed remediations multiplied by the configured engineer-hours estimate per remediation.")}
+        {render_metric_box("panel", "Estimated cost avoided", f"${metrics.estimated_cost_avoided:,.0f}", "Engineer hours avoided multiplied by the configured hourly engineering cost.")}
+        {render_metric_box("panel", "Backlog reduction", f"{metrics.backlog_reduction_percentage:.1f}%", "Completed remediations as a percentage of all tracked findings.")}
+        {render_metric_box("panel", "Average remediation cycle time", duration(metrics.average_remediation_cycle_time_seconds), "Average time from job creation until tracked jobs reached completed or failed.")}
       </div>
     </section>
 
@@ -107,6 +158,18 @@ curl -X POST http://localhost:8000/poll</pre>
   </main>
 </body>
 </html>"""
+
+
+def render_metric_box(class_name: str, label: str, value: str, description: str) -> str:
+    return (
+        f'<div class="{escape(class_name)} metric-box" tabindex="0" '
+        f'aria-label="{escape(label)}: {escape(value)}. {escape(description)}" '
+        f'data-description="{escape(description)}">'
+        f'<div class="metric-heading"><div class="label">{escape(label)}</div>'
+        f'<span class="metric-help" tabindex="0" aria-label="{escape(description)}" title="{escape(description)}">?'
+        f'<span class="metric-tooltip" role="tooltip">{escape(description)}</span></span></div>'
+        f'<div class="value">{escape(value)}</div></div>'
+    )
 
 
 def render_job_row(job: RemediationJob) -> str:

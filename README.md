@@ -1,6 +1,6 @@
 # Devin Vulnerability Remediator
 
-A small event-driven vulnerability remediation control plane for a take-home assignment. It accepts GitHub issue label webhooks, starts Devin sessions, polls session insights, tracks remediation jobs in SQLite, comments back on GitHub issues, and exposes a simple dashboard and report.
+A small event-driven vulnerability remediation control plane. It accepts GitHub issue label webhooks, starts Devin sessions, polls session insights, tracks remediation jobs in SQLite, comments back on GitHub issues, and exposes a simple dashboard and report.
 
 ## Quick Demo
 
@@ -58,32 +58,51 @@ curl -X POST http://localhost:8000/poll
 
 ## Real Mode
 
-Set real credentials and disable demo mode:
+Create or edit your local `.env` file and replace the placeholder values:
 
 ```bash
-export DEMO_MODE=false
-export APP_MODE=real
-export DEVIN_MODE=real
-export GITHUB_MODE=real
-export GITHUB_WEBHOOK_SECRET="your-webhook-secret"
-export GITHUB_TOKEN="github-token-with-issue-comment-permission"
-export DEVIN_API_KEY="your-devin-api-key"
-export DEVIN_ORG_ID="your-devin-org-id"
-export DEVIN_BASE_URL="https://api.devin.ai"
-export DEVIN_REPOS="your-user/superset"
-# Optional:
-# export DEVIN_MAX_ACU_LIMIT=10
-# export DEVIN_ENTERPRISE_ANALYTICS=true
-export DATABASE_PATH="data/remediator.db"
-uvicorn app.main:app --reload
+$EDITOR .env
 ```
 
-Configure a GitHub issue webhook on your forked Apache Superset repository:
+At minimum, set these values in `.env`:
 
-- Payload URL: `https://your-host/webhooks/github`
+- `GITHUB_WEBHOOK_SECRET`: a long random string; use the same value in the GitHub webhook UI.
+- `GITHUB_TOKEN`: a fine-grained personal access token with Issues read/write access to your Superset fork.
+- `DEVIN_API_KEY`: your Devin API key.
+- `DEVIN_ORG_ID`: your Devin organization ID.
+- `DEVIN_REPOS`: your fork, for example `your-user/superset`.
+
+Start the app and have Uvicorn load the env file:
+
+```bash
+. .venv/bin/activate
+uvicorn app.main:app --env-file .env --host 0.0.0.0 --port 8000
+```
+
+Confirm real mode is active:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"ok":true,"app_mode":"real","demo_mode":false}
+```
+
+Expose your local app to GitHub with ngrok (reverse proxy):
+
+```bash
+ngrok http 8000
+```
+
+Copy the HTTPS forwarding URL from ngrok, then configure a GitHub issue webhook on your forked Apache Superset repository:
+
+- Payload URL: `https://{your-ngrok-host}.ngrok-free.app/webhooks/github`
 - Content type: `application/json`
 - Secret: same value as `GITHUB_WEBHOOK_SECRET`
-- Events: issue label events
+- Events: Issues
 
 When an issue receives the label `devin-remediate`, the control plane validates the webhook signature and starts a Devin remediation session.
 
@@ -120,7 +139,7 @@ uvicorn app.main:app --reload
 
 ## Creating Credible Superset Issues
 
-The take-home demo is strongest when the 5 to 8 GitHub issues come from real scanner output or real security-hygiene review findings in your forked Apache Superset repository. Do not invent CVEs or claim exploitability beyond what the scanner or code review supports. `demo/findings.example.json` contains demo templates only; use it for formatting, not as final submission evidence.
+The demo is strongest when the GitHub issues come from real scanner output or real security-hygiene review findings in your forked Apache Superset repository. Do not invent CVEs or claim exploitability beyond what the scanner or code review supports. `demo/findings.example.json` contains demo templates only; use it for formatting, not as final submission evidence.
 
 Recommended workflow:
 
@@ -149,7 +168,7 @@ GITHUB_REPOSITORY=your-user/superset python scripts/create_github_issues_from_fi
 ```bash
 export GITHUB_TOKEN=your-token
 export GITHUB_REPOSITORY=your-user/superset
-python scripts/create_github_issues_from_findings.py --limit 8
+python scripts/create_github_issues_from_findings.py --limit 5
 ```
 
 Each created issue gets the labels `security`, `devin-remediate`, and `demo`. If your webhook is configured, applying or creating the issue with `devin-remediate` can trigger the control plane automation.

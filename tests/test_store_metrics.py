@@ -55,6 +55,52 @@ def test_update_from_insights_tracks_pr_completion_and_acu() -> None:
     assert updated.acu_used == 3.5
 
 
+def test_update_from_insights_tracks_pr_and_waiting_status_detail() -> None:
+    store = Store(db_path())
+    job = store.create_or_get_job(event())
+    job = store.attach_session(job.id, "session-1", "https://app.devin.ai/sessions/session-1")
+
+    updated = store.update_from_insights(
+        job.id,
+        SessionInsights(
+            status="running",
+            status_detail="waiting_for_user",
+            pr_url="https://github.com/me/superset/pull/31",
+            pr_state="open",
+            needs_input=True,
+        ),
+    )
+
+    assert updated.status == JobStatus.PR_OPENED
+    assert updated.status_detail == "waiting_for_user"
+    assert updated.pr_url == "https://github.com/me/superset/pull/31"
+    assert updated.pr_state == "open"
+    assert updated.pr_opened_at is not None
+
+
+def test_metrics_count_waiting_status_detail_even_when_pr_is_opened() -> None:
+    store = Store(db_path())
+    job = store.create_or_get_job(event())
+    job = store.attach_session(job.id, "session-1", "https://app.devin.ai/sessions/session-1")
+    store.update_from_insights(
+        job.id,
+        SessionInsights(
+            status="running",
+            status_detail="waiting_for_user",
+            pr_url="https://github.com/me/superset/pull/31",
+            pr_state="open",
+            needs_input=True,
+        ),
+    )
+
+    metrics = build_metrics(store.list_jobs())
+
+    assert metrics.pr_created_jobs == 1
+    assert metrics.waiting_jobs == 1
+    assert metrics.active_devin_sessions == 0
+    assert metrics.completion_rate == 0
+
+
 def test_metrics_summarize_control_plane_outcomes() -> None:
     store = Store(db_path())
     completed = store.create_or_get_job(event(1))
@@ -69,8 +115,10 @@ def test_metrics_summarize_control_plane_outcomes() -> None:
     metrics = build_metrics(store.list_jobs())
 
     assert metrics.active_sessions == 1
+    assert metrics.active_devin_sessions == 1
     assert metrics.completed_remediations == 1
     assert metrics.prs_opened == 1
+    assert metrics.completion_rate == 0.5
     assert metrics.success_rate == 1
     assert metrics.total_acu_used == 4
 

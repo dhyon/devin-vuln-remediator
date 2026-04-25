@@ -51,6 +51,45 @@ def test_session_insights_parsing() -> None:
     asyncio.run(run())
 
 
+def test_session_insights_parses_devin_pr_url_status_detail_and_epoch_timestamps() -> None:
+    async def run() -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "acus_consumed": 0.0,
+                    "created_at": 1777080275,
+                    "updated_at": 1777080854,
+                    "num_devin_messages": 2,
+                    "num_user_messages": 1,
+                    "org_id": "org-1",
+                    "pull_requests": [{"pr_state": "open", "pr_url": "https://github.com/me/superset/pull/31"}],
+                    "session_id": "sess-456",
+                    "session_size": "xs",
+                    "status": "running",
+                    "status_detail": "waiting_for_user",
+                },
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api.devin.ai")
+        try:
+            analytics = AnalyticsClient(api_key="secret-token", org_id="org-1", http_client=client)
+            insights = await analytics.get_session_insights("sess-456")
+        finally:
+            await client.aclose()
+
+        assert insights.status == "running"
+        assert insights.status_detail == "waiting_for_user"
+        assert insights.needs_input
+        assert insights.pr_url == "https://github.com/me/superset/pull/31"
+        assert insights.pr_state == "open"
+        assert insights.pull_requests == ["https://github.com/me/superset/pull/31"]
+        assert insights.created_at is not None
+        assert insights.updated_at is not None
+
+    asyncio.run(run())
+
+
 def test_enterprise_analytics_permission_failure_is_graceful() -> None:
     async def run() -> None:
         async def handler(request: httpx.Request) -> httpx.Response:

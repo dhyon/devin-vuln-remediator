@@ -1,4 +1,5 @@
 .venv/
+.env
 .tmp/
 .pytest_cache/
 .pytest-tmp/

@@ -9,9 +9,11 @@ from pydantic import BaseModel, Field
 
 class JobStatus(StrEnum):
     QUEUED = "queued"
+    SESSION_STARTING = "session_starting"
     SESSION_STARTED = "session_started"
     RUNNING = "running"
     PR_OPENED = "pr_opened"
+    PR_CLOSED = "pr_closed"
     WAITING_FOR_USER = "waiting_for_user"
     WAITING_FOR_APPROVAL = "waiting_for_approval"
     COMPLETED = "completed"
@@ -60,8 +62,10 @@ class DevinSession(BaseModel):
 
 class SessionInsights(BaseModel):
     status: str
+    status_detail: str | None = None
     acu_used: float = 0
     pr_url: str | None = None
+    pr_state: str | None = None
     pull_requests: list[str] = Field(default_factory=list)
     needs_input: bool = False
     failure_reason: str | None = None
@@ -126,10 +130,12 @@ class RemediationJob(BaseModel):
 class MetricsSummary(BaseModel):
     total_jobs: int
     active_jobs: int
+    active_devin_sessions: int
     completed_jobs: int
     failed_jobs: int
     waiting_jobs: int
     pr_created_jobs: int
+    completion_rate: float
     success_rate: float
     average_time_to_pr_seconds: float | None = None
     median_time_to_pr_seconds: float | None = None
@@ -143,7 +149,7 @@ class MetricsSummary(BaseModel):
 
     @property
     def active_sessions(self) -> int:
-        return self.active_jobs
+        return self.active_devin_sessions
 
     @property
     def completed_remediations(self) -> int:
