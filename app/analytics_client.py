@@ -41,7 +41,7 @@ class AnalyticsClient:
     async def get_session_daily_consumption(self, session_id: str) -> SessionConsumption | None:
         if not self.enterprise_consumption_enabled:
             return None
-        path = f"/v3/enterprise/consumption/daily/sessions/{session_id}"
+        path = f"/v3/organizations/{self.org_id}/consumption/daily/sessions/{session_id}"
         try:
             data = await self._request_json("GET", path)
         except DevinApiError as exc:
@@ -162,7 +162,7 @@ def parse_session_insights(data: dict[str, Any]) -> SessionInsights:
 def parse_session_consumption(session_id: str, data: dict[str, Any]) -> SessionConsumption:
     return SessionConsumption(
         session_id=str(data.get("session_id") or session_id),
-        acus_consumed=float(data.get("acus_consumed") or data.get("acu_used") or 0),
+        acus_consumed=float(data.get("total_acus") or data.get("acus_consumed") or data.get("acu_used") or 0),
         date=data.get("date") or data.get("day"),
         raw=data,
     )

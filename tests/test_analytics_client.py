@@ -93,7 +93,7 @@ def test_session_insights_parses_devin_pr_url_status_detail_and_epoch_timestamps
 def test_enterprise_analytics_permission_failure_is_graceful() -> None:
     async def run() -> None:
         async def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url.path == "/v3/enterprise/consumption/daily/sessions/sess-123"
+            assert request.url.path == "/v3/organizations/org-1/consumption/daily/sessions/sess-123"
             return httpx.Response(403, json={"detail": "forbidden"})
 
         client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api.devin.ai")
@@ -112,5 +112,50 @@ def test_enterprise_analytics_permission_failure_is_graceful() -> None:
         assert consumption.unavailable
         assert consumption.unavailable_reason == "Enterprise analytics unavailable: HTTP 403"
         assert analytics.enterprise_unavailable_reason == "Enterprise analytics unavailable: HTTP 403"
+
+    asyncio.run(run())
+
+
+def test_enterprise_analytics_parses_organization_session_daily_consumption() -> None:
+    async def run() -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "GET"
+            assert request.url.path == "/v3/organizations/org-1/consumption/daily/sessions/devin-abc123"
+            return httpx.Response(
+                200,
+                json={
+                    "consumption_by_date": [
+                        {
+                            "acus": 1.25,
+                            "acus_by_product": {"cascade": 0.25, "devin": 1.0, "terminal": 0},
+                            "date": 1777075200,
+                        },
+                        {
+                            "acus": 2.5,
+                            "acus_by_product": {"cascade": 0.5, "devin": 2.0, "terminal": 0},
+                            "date": 1777161600,
+                        },
+                    ],
+                    "total_acus": 3.75,
+                },
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api.devin.ai")
+        try:
+            analytics = AnalyticsClient(
+                api_key="secret-token",
+                org_id="org-1",
+                enterprise_consumption_enabled=True,
+                http_client=client,
+            )
+            consumption = await analytics.get_session_daily_consumption("devin-abc123")
+        finally:
+            await client.aclose()
+
+        assert consumption is not None
+        assert not consumption.unavailable
+        assert consumption.session_id == "devin-abc123"
+        assert consumption.acus_consumed == 3.75
+        assert consumption.raw["consumption_by_date"][0]["acus"] == 1.25
 
     asyncio.run(run())

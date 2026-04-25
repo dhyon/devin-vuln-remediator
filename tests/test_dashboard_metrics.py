@@ -87,4 +87,15 @@ def test_dashboard_metric_boxes_include_hover_descriptions() -> None:
     assert 'class="metric-tooltip" role="tooltip"' in html
     assert 'title="All security findings currently tracked by the control plane."' in html
     assert 'data-description="All security findings currently tracked by the control plane."' in html
+    assert "Completed Remediations (PRs Merged)" in html
     assert 'aria-label="Completion rate:' in html
+
+
+def test_dashboard_includes_manual_poll_action() -> None:
+    html = render_dashboard([])
+
+    assert 'id="poll-now"' in html
+    assert "Poll Status Now" in html
+    assert 'id="poll-status"' in html
+    assert 'fetch("/poll", { method: "POST" })' in html
+    assert "window.location.reload()" in html

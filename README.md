@@ -119,7 +119,7 @@ Common optional variables:
 - `ENGINEER_HOURS_PER_REMEDIATION`: defaults to `2.0`.
 - `ENGINEER_HOURLY_COST`: defaults to `150.0`.
 
-Real mode uses SQLite at `/data/remediator-real.db` inside the container, bind-mounted to `./data` by Compose.
+Real mode uses SQLite to persist state at `/data/remediator-real.db` inside the container, bind-mounted to `./data` by Compose.
 
 Health check:
 

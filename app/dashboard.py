@@ -20,9 +20,9 @@ def render_dashboard(
         ("Total findings", str(metrics.total_jobs), "All security findings currently tracked by the control plane."),
         ("Open remediation jobs", str(metrics.active_jobs), "Jobs still in the remediation workflow, including queued, running, PR-opened, and waiting states."),
         ("Active Devin sessions", str(metrics.active_devin_sessions), "Jobs with Devin sessions that are started, running, or waiting for user or approval input."),
-        ("Completed remediations", str(metrics.completed_jobs), "Jobs Devin has finished successfully."),
+        ("Completed jobs (PRs Merged)", str(metrics.completed_jobs), "Jobs Devin has finished successfully."),
         ("PRs opened", str(metrics.pr_created_jobs), "Tracked jobs where Devin has opened a remediation pull request."),
-        ("Completion rate", pct(metrics.completion_rate), "Completed remediations divided by all tracked findings."),
+        ("Completion rate", pct(metrics.completion_rate), "Completed remediation jobs divided by all tracked findings."),
         ("Terminal success rate", pct(metrics.success_rate), "Completed jobs divided by jobs that reached either completed or failed."),
         ("Median time to PR", duration(metrics.median_time_to_pr_seconds), "The middle time from job creation to Devin opening a pull request."),
         ("Average time to completion", duration(metrics.average_time_to_completion_seconds), "Average time from job creation until jobs reached completed or failed."),
@@ -49,10 +49,15 @@ curl -X POST http://localhost:8000/poll</pre>
   <style>
     :root {{ color-scheme: light; }}
     body {{ margin: 0; font-family: Inter, Segoe UI, Arial, sans-serif; background: #f6f7f9; color: #172033; }}
-    header {{ background: #fff; border-bottom: 1px solid #dde3ea; padding: 24px 32px; }}
+    header {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #fff; border-bottom: 1px solid #dde3ea; padding: 24px 32px; }}
     main {{ padding: 24px 32px 40px; }}
     h1 {{ margin: 0; font-size: 26px; letter-spacing: 0; }}
     h2 {{ font-size: 18px; margin: 28px 0 12px; }}
+    .dashboard-actions {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }}
+    .poll-button {{ border: 1px solid #075985; border-radius: 6px; background: #075985; color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 650; padding: 8px 12px; }}
+    .poll-button:hover:not(:disabled) {{ background: #0c4a6e; }}
+    .poll-button:disabled {{ cursor: wait; opacity: .7; }}
+    .poll-status {{ color: #64748b; font-size: 13px; min-height: 18px; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }}
     .card, .panel {{ background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 14px; }}
     .metric-box {{ position: relative; outline: none; }}
@@ -122,6 +127,10 @@ curl -X POST http://localhost:8000/poll</pre>
 <body>
   <header>
     <h1>Devin Vulnerability Remediation Control Plane</h1>
+    <div class="dashboard-actions">
+      <button class="poll-button" id="poll-now" type="button">Poll Status Now</button>
+      <span class="poll-status" id="poll-status" aria-live="polite"></span>
+    </div>
   </header>
   <main>
     <section class="grid">{card_html}</section>
@@ -156,6 +165,28 @@ curl -X POST http://localhost:8000/poll</pre>
 
     {demo_controls}
   </main>
+  <script>
+    const pollNowButton = document.getElementById("poll-now");
+    const pollStatus = document.getElementById("poll-status");
+
+    pollNowButton.addEventListener("click", async () => {{
+      pollNowButton.disabled = true;
+      pollStatus.textContent = "Polling...";
+
+      try {{
+        const response = await fetch("/poll", {{ method: "POST" }});
+        if (!response.ok) {{
+          throw new Error(`Poll failed with status ${{response.status}}`);
+        }}
+        const result = await response.json();
+        pollStatus.textContent = `Updated ${{result.updated}} job(s). Refreshing...`;
+        window.location.reload();
+      }} catch (error) {{
+        pollStatus.textContent = "Poll failed.";
+        pollNowButton.disabled = false;
+      }}
+    }});
+  </script>
 </body>
 </html>"""
 
