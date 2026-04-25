@@ -108,7 +108,7 @@ Required environment variables:
 - `GITHUB_TOKEN`: GitHub token with issue comment access and PR read access for the target repo.
 - `DEVIN_API_KEY`: Devin API key.
 - `DEVIN_ORG_ID`: Devin organization ID.
-- `DEVIN_REPOS`: comma-separated repository allowlist, for example `your-user/superset`.
+- `DEVIN_REPOS`: comma-separated repository allowlist, for example `your-github-user/superset`.
 
 Common optional variables:
 
@@ -133,14 +133,16 @@ Expected real-mode shape:
 {"ok":true,"app_mode":"real","demo_mode":false}
 ```
 
-For GitHub webhooks, expose the service with a tunnel such as ngrok and configure:
+For GitHub webhooks, expose the service (http://localhost:8000) with a tunnel such as ngrok and configure:
 
 - Payload URL: `https://<host>/webhooks/github`
 - Content type: `application/json`
 - Secret: `GITHUB_WEBHOOK_SECRET`
 - Events: Issues
 
-## Creating Real Superset Issues
+## Creating Real Github Issues for Superset Repo
+
+Note: Skip to steps 4 and 5 if you just want to upload the pre-curated issues in `demo/findings.json` to Github.
 
 Recommended workflow:
 
@@ -152,23 +154,23 @@ SUPERSET_REPO_PATH=/path/to/superset bash scripts/run_bandit_superset.sh
 SUPERSET_REPO_PATH=/path/to/superset bash scripts/run_safety_superset.sh
 ```
 
-3. Curate 5 to 8 findings into `demo/findings.json`. Keep scanner output and affected paths grounded in the fork you actually scanned.
+3. Curate your findings into `demo/findings.json`. Keep scanner output and affected paths grounded in the fork you actually scanned.
 4. Preview the GitHub issues:
 
 ```bash
-GITHUB_REPOSITORY=your-user/superset python scripts/create_github_issues_from_findings.py --dry-run
+python scripts/create_github_issues_from_findings.py --repo your-github-user/superset --dry-run
 ```
 
 5. Create the issues:
 
 ```bash
 export GITHUB_TOKEN=your-token
-python scripts/create_github_issues_from_findings.py --repo your-user/superset --limit 8
+python scripts/create_github_issues_from_findings.py --repo your-github-user/superset --limit 8
 ```
 
 The script creates issues with `security`, `devin-remediate`, and `demo` labels. If the webhook is configured, creating or labeling those issues triggers Devin sessions.
 
-This repository includes curated Superset-style demo findings and sample scanner output under `demo/`, including `demo/findings.json`, `demo/bandit-results.json`, `demo/dependency-results.json`, and `demo/pip-audit-results.json`. Treat them as demo fixtures unless you regenerate and validate them against your own Superset fork.
+This repository includes real, curated Superset-style findings and sample scanner output under `demo/`, including `demo/findings.json`, `demo/bandit-results.json`, `demo/dependency-results.json`, and `demo/pip-audit-results.json`.
 
 ## Observability
 
@@ -185,23 +187,15 @@ The dashboard and report estimate impact from completed remediations using confi
 - `ENGINEER_HOURS_PER_REMEDIATION`
 - `ENGINEER_HOURLY_COST`
 
-Example only, using demo-style numbers:
-
-- 8 findings queued
-- 5 PRs opened
-- Median time to PR: 18 minutes
-- Estimated engineer hours avoided: 10 hours
-- Estimated cost avoided: $1,500
-
 These are not production claims. They are the kind of operating metrics the control plane is designed to surface once connected to real findings and real Devin sessions.
 
 ## Limitations
 
 - Human review is required; this system does not auto-merge.
-- Remediation quality depends on finding quality and acceptance criteria quality.
-- Enterprise ACU analytics may require account permissions and can be unavailable.
-- Scanner integration is intentionally simple: scripts produce raw output, and humans curate the final issue set.
 - Polling is exposed as `POST /poll`; a production deployment would typically run it on a schedule.
+- Enterprise ACU analytics may require account permissions and can be unavailable.
+- Remediation quality depends on scanning quality and acceptance criteria quality.
+- Scanner integration is intentionally simple: scripts produce raw output, and humans curate the final issue set.
 - SQLite is appropriate for the assignment and local operation, not a multi-region control plane.
 
 ## Phase 2
