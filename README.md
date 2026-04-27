@@ -114,6 +114,7 @@ Common optional variables:
 
 - `TRIGGER_LABEL`: defaults to `devin-remediate`.
 - `DEVIN_MAX_ACU_LIMIT`: optional max ACU limit sent when creating Devin sessions.
+- `DEVIN_CREATE_AS_USER_ID`: optional Devin user id for `create_as_user_id`, used when sessions should be attributed to a human user instead of the service user.
 - `DEVIN_ENTERPRISE_ANALYTICS`: set `true` to attempt enterprise consumption lookups.
 - `POLL_LIMIT`: defaults to `25`.
 - `ENGINEER_HOURS_PER_REMEDIATION`: defaults to `2.0`.

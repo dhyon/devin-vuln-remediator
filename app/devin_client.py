@@ -10,9 +10,10 @@ from app.models import DevinSession
 
 
 class DevinApiError(RuntimeError):
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(self, message: str, status_code: int | None = None, response_body: str | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.response_body = response_body
 
 
 class DevinClient(Protocol):
@@ -39,6 +40,7 @@ class RealDevinClient:
         org_id: str,
         base_url: str = "https://api.devin.ai",
         max_acu_limit: float | None = None,
+        create_as_user_id: str | None = None,
         default_repos: list[str] | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
@@ -46,6 +48,7 @@ class RealDevinClient:
         self.org_id = org_id
         self.base_url = base_url.rstrip("/")
         self.max_acu_limit = max_acu_limit
+        self.create_as_user_id = create_as_user_id
         self.default_repos = default_repos or []
         self.http_client = http_client
 
@@ -66,6 +69,8 @@ class RealDevinClient:
             payload["repos"] = session_repos
         if self.max_acu_limit is not None:
             payload["max_acu_limit"] = self.max_acu_limit
+        if self.create_as_user_id:
+            payload["create_as_user_id"] = self.create_as_user_id
 
         data = await self._request_json(
             "POST",
@@ -104,9 +109,11 @@ class RealDevinClient:
                 await client.aclose()
 
         if response.status_code < 200 or response.status_code >= 300:
+            error_body = _safe_error_body(response)
             raise DevinApiError(
-                f"Devin API {method} {path} failed with HTTP {response.status_code}: {_safe_error_body(response)}",
+                f"Devin API {method} {path} failed with HTTP {response.status_code}: {error_body}",
                 status_code=response.status_code,
+                response_body=error_body,
             )
         if not response.content:
             return {}

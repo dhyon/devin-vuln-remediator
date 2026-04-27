@@ -20,12 +20,12 @@ def render_dashboard(
         ("Total findings", str(metrics.total_jobs), "All security findings currently tracked by the control plane."),
         ("Open remediation jobs", str(metrics.active_jobs), "Jobs still in the remediation workflow, including queued, running, PR-opened, and waiting states."),
         ("Active Devin sessions", str(metrics.active_devin_sessions), "Jobs with Devin sessions that are started, running, or waiting for user or approval input."),
-        ("Completed jobs (PRs Merged)", str(metrics.completed_jobs), "Jobs Devin has finished successfully."),
         ("PRs opened", str(metrics.pr_created_jobs), "Tracked jobs where Devin has opened a remediation pull request."),
-        ("Completion rate", pct(metrics.completion_rate), "Completed remediation jobs divided by all tracked findings."),
-        ("Terminal success rate", pct(metrics.success_rate), "Completed jobs divided by jobs that reached either completed or failed."),
-        ("Median time to PR", duration(metrics.median_time_to_pr_seconds), "The middle time from job creation to Devin opening a pull request."),
-        ("Average time to completion", duration(metrics.average_time_to_completion_seconds), "Average time from job creation until jobs reached completed or failed."),
+        ("Completed jobs (PRs Merged)", str(metrics.completed_jobs), "Jobs Devin has finished successfully."),
+        #("Completion rate", pct(metrics.completion_rate), "Completed remediation jobs divided by all tracked findings."),
+        #("Terminal success rate", pct(metrics.success_rate), "Completed jobs divided by jobs that reached either completed or failed."),
+        #("Median time to PR", duration(metrics.median_time_to_pr_seconds), "The middle time from job creation to Devin opening a pull request."),
+        #("Average time to completion", duration(metrics.average_time_to_completion_seconds), "Average time from job creation until jobs reached completed or failed."),
         ("Total ACUs consumed", f"{metrics.total_acus_consumed:.1f}", "Total Agent Compute Units reported across tracked Devin sessions."),
     ]
     card_html = "\n".join(render_metric_box("card", label, value, description) for label, value, description in cards)
@@ -138,10 +138,11 @@ curl -X POST http://localhost:8000/poll</pre>
     <section>
       <h2>Business impact</h2>
       <div class="impact">
-        {render_metric_box("panel", "Engineer hours avoided", f"{metrics.engineer_hours_avoided:.1f}", "Completed remediations multiplied by the configured engineer-hours estimate per remediation.")}
-        {render_metric_box("panel", "Estimated cost avoided", f"${metrics.estimated_cost_avoided:,.0f}", "Engineer hours avoided multiplied by the configured hourly engineering cost.")}
+        {render_metric_box("panel", "Engineer hours saved", f"{metrics.engineer_hours_avoided:.1f}", "Completed remediations multiplied by the configured engineer-hours estimate per remediation.")}
+        {render_metric_box("panel", "Estimated cost saved", f"${metrics.estimated_cost_avoided:,.0f}", "Engineer hours avoided multiplied by the configured hourly engineering cost.")}
         {render_metric_box("panel", "Backlog reduction", f"{metrics.backlog_reduction_percentage:.1f}%", "Completed remediations as a percentage of all tracked findings.")}
-        {render_metric_box("panel", "Average remediation cycle time", duration(metrics.average_remediation_cycle_time_seconds), "Average time from job creation until tracked jobs reached completed or failed.")}
+        {render_metric_box("panel", "Average time to PR", duration(metrics.average_time_to_pr_seconds), "Average time from job creation until Devin opened a pull request.")}
+        {render_metric_box("panel", "Median time to PR", duration(metrics.median_time_to_pr_seconds), "Middle time from job creation until Devin opened a pull request.")}
       </div>
     </section>
 

@@ -29,6 +29,7 @@ devin_client = (
         org_id=settings.devin_org_id,
         base_url=settings.devin_api_base_url,
         max_acu_limit=settings.devin_max_acu_limit,
+        create_as_user_id=settings.devin_create_as_user_id,
         default_repos=list(settings.devin_repos),
     )
 )

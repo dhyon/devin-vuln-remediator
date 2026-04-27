@@ -57,7 +57,10 @@ class RemediationPoller:
         except DevinApiError as exc:
             reason = user_safe_devin_error(exc)
             job = self.store.mark_failed(job.id, reason)
-            self.store.record_event(job.id, "session_start_failed", reason, {"status_code": exc.status_code})
+            payload: dict[str, object] = {"status_code": exc.status_code}
+            if exc.response_body:
+                payload["devin_response"] = exc.response_body
+            self.store.record_event(job.id, "session_start_failed", reason, payload)
             await self._safe_comment_on_issue(
                 job,
                 job.repository,
@@ -166,8 +169,13 @@ class RemediationPoller:
 def user_safe_devin_error(exc: DevinApiError) -> str:
     if exc.status_code == 429:
         return "Devin concurrent session limit reached. Put an existing Devin session to sleep or wait for capacity, then redeliver the webhook or reapply the trigger label."
-    if exc.status_code in {401, 403}:
-        return "Devin API authorization failed. Check DEVIN_API_KEY, DEVIN_ORG_ID, and account access."
+    if exc.status_code == 401:
+        return "Devin API authentication failed. Check DEVIN_API_KEY and DEVIN_ORG_ID."
+    if exc.status_code == 403:
+        reason = "Devin API permission denied. Ensure the service user role includes UseDevinSessions and has access to the target repository."
+        if exc.response_body:
+            reason = f"{reason} Devin response: {exc.response_body}"
+        return reason
     return f"Devin API request failed with HTTP {exc.status_code or 'unknown'}."
 
 

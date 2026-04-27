@@ -12,6 +12,7 @@ ENV_KEYS = [
     "GITHUB_MODE",
     "DEVIN_API_KEY",
     "DEVIN_ORG_ID",
+    "DEVIN_CREATE_AS_USER_ID",
     "GITHUB_TOKEN",
     "GITHUB_WEBHOOK_SECRET",
     "DATABASE_PATH",
@@ -67,6 +68,7 @@ def test_real_mode_accepts_required_credentials(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("GITHUB_MODE", "real")
     monkeypatch.setenv("DEVIN_API_KEY", "devin-token")
     monkeypatch.setenv("DEVIN_ORG_ID", "org-1")
+    monkeypatch.setenv("DEVIN_CREATE_AS_USER_ID", "user-1")
     monkeypatch.setenv("GITHUB_TOKEN", "github-token")
     monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "webhook-secret")
 
@@ -75,6 +77,7 @@ def test_real_mode_accepts_required_credentials(monkeypatch: pytest.MonkeyPatch)
     assert not settings.demo_mode
     assert settings.devin_api_key == "devin-token"
     assert settings.devin_org_id == "org-1"
+    assert settings.devin_create_as_user_id == "user-1"
     assert settings.github_token == "github-token"
 
 

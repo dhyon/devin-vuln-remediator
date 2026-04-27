@@ -34,6 +34,7 @@ def test_create_session_request_shape() -> None:
                 api_key="secret-token",
                 org_id="org-1",
                 max_acu_limit=10,
+                create_as_user_id="user-1",
                 http_client=client,
             )
             session = await devin.create_session(
@@ -54,6 +55,7 @@ def test_create_session_request_shape() -> None:
             "tags": ["security"],
             "repos": ["me/superset"],
             "max_acu_limit": 10,
+            "create_as_user_id": "user-1",
         }
         assert session.session_id == "sess-123"
 

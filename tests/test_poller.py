@@ -12,7 +12,7 @@ from app.devin_client import DevinApiError, MockDevinClient
 from app.github_client import MockGitHubClient
 from app.models import DevinSession
 from app.models import GitHubIssueEvent, JobStatus, SessionConsumption, SessionInsights
-from app.poller import RemediationPoller, parse_github_pull_url
+from app.poller import RemediationPoller, parse_github_pull_url, user_safe_devin_error
 from app.store import Store
 
 
@@ -251,6 +251,19 @@ def test_poll_marks_job_pr_closed_when_linked_github_pr_is_closed_without_merge(
 def test_parse_github_pull_url() -> None:
     assert parse_github_pull_url("https://github.com/me/superset/pull/9") == ("me", "superset", 9)
     assert parse_github_pull_url("https://github.com/me/superset/issues/9") is None
+
+
+def test_devin_authentication_and_permission_errors_are_distinct() -> None:
+    auth_message = user_safe_devin_error(DevinApiError("unauthorized", status_code=401))
+    permission_message = user_safe_devin_error(
+        DevinApiError("forbidden", status_code=403, response_body='{"detail":"missing role"}')
+    )
+
+    assert "authentication failed" in auth_message
+    assert "DEVIN_API_KEY" in auth_message
+    assert "permission denied" in permission_message
+    assert "UseDevinSessions" in permission_message
+    assert "missing role" in permission_message
 
 
 class FailingDevinClient:

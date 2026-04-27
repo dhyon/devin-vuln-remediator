@@ -25,6 +25,7 @@ class Settings:
     devin_api_base_url: str = "https://api.devin.ai"
     devin_mode: str = "mock"
     devin_max_acu_limit: float | None = None
+    devin_create_as_user_id: str | None = None
     devin_repos: tuple[str, ...] = ()
     devin_enterprise_analytics: bool = False
     target_label: str = "devin-remediate"
@@ -59,6 +60,7 @@ class Settings:
             devin_api_base_url=os.getenv("DEVIN_BASE_URL", os.getenv("DEVIN_API_BASE_URL", cls.devin_api_base_url)),
             devin_mode=devin_mode,
             devin_max_acu_limit=float(max_acu) if max_acu else None,
+            devin_create_as_user_id=os.getenv("DEVIN_CREATE_AS_USER_ID"),
             devin_repos=repos,
             devin_enterprise_analytics=os.getenv("DEVIN_ENTERPRISE_ANALYTICS", "false").lower() in {"1", "true", "yes", "on"},
             target_label=os.getenv("TRIGGER_LABEL", os.getenv("TARGET_LABEL", cls.target_label)),

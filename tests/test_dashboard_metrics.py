@@ -79,7 +79,18 @@ def test_metrics_calculate_time_to_pr_and_completion() -> None:
 
 
 def test_dashboard_metric_boxes_include_hover_descriptions() -> None:
-    html = render_dashboard([job(1, JobStatus.COMPLETED, datetime(2026, 4, 24, 12, tzinfo=UTC), completed_after=600)])
+    html = render_dashboard(
+        [
+            job(
+                1,
+                JobStatus.COMPLETED,
+                datetime(2026, 4, 24, 12, tzinfo=UTC),
+                pr_after=300,
+                completed_after=600,
+                pr_url="https://github.com/me/superset/pull/1",
+            )
+        ]
+    )
 
     assert 'class="card metric-box"' in html
     assert 'class="panel metric-box"' in html
@@ -87,7 +98,10 @@ def test_dashboard_metric_boxes_include_hover_descriptions() -> None:
     assert 'class="metric-tooltip" role="tooltip"' in html
     assert 'title="All security findings currently tracked by the control plane."' in html
     assert 'data-description="All security findings currently tracked by the control plane."' in html
-    assert "Completed Remediations (PRs Merged)" in html
+    assert "Completed jobs (PRs Merged)" in html
+    assert "Average time to PR" in html
+    assert "Median time to PR" in html
+    assert "Average remediation cycle time" not in html
     assert 'aria-label="Completion rate:' in html
 
 
